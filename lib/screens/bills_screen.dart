@@ -1,129 +1,147 @@
+import 'package:creed_assignment/widgets/stacked_carousel.dart';
 import 'package:flutter/material.dart';
-import '../data/api_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models.dart';
+import '../provider.dart';
+import '../widgets/bill_card_widget.dart';
 
-class BillsScreen extends StatefulWidget {
+class BillsScreen extends ConsumerWidget {
   const BillsScreen({super.key});
 
   @override
-  State<BillsScreen> createState() => _BillsScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final billsAsync = ref.watch(billsProvider);
+    final use2Items = ref.watch(use2ItemsProvider);
 
-class _BillsScreenState extends State<BillsScreen> {
-  late Future<BillSection> _billsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _billsFuture = ApiService().fetchBills();
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: FutureBuilder<BillSection>(
-        future: _billsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Colors.white),
-            );
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                "Error: ${snapshot.error}",
-                style: const TextStyle(color: Colors.white),
-              ),
-            );
-          }
-
-          final section = snapshot.data!;
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(24),
-            itemCount: section.cards.length,
-            itemBuilder: (context, index) {
-              final card = section.cards[index];
-              return buildBillCard(card);
-            },
-          );
-        },
+      backgroundColor: const Color(0xFF0C0C0D),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0C0C0D),
+        elevation: 0,
+        title: const Text(
+          'CRED',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                ref.read(use2ItemsProvider.notifier).state = !use2Items,
+            child: Text(
+              use2Items ? 'Show 9 items' : 'Show 2 items',
+              style: const TextStyle(color: Color(0xFF00D09C), fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+      body: billsAsync.when(
+        data: (section) => _Body(section: section),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF00D09C)),
+        ),
+        error: (err, _) => _ErrorView(
+          message: err.toString(),
+          onRetry: () => ref.invalidate(billsProvider),
+        ),
       ),
     );
   }
+}
 
-  Widget buildBillCard(BillCard card) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      height: 90,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.black,
-              backgroundImage: card.body.logo.url.isNotEmpty
-                  ? NetworkImage(card.body.logo.url)
-                  : null,
-            ),
+class _Body extends StatelessWidget {
+  final BillSection section;
+  const _Body({required this.section});
 
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    card.body.title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    card.body.subTitle,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                section.title.toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xFF8E8E93),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.0,
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00D09C).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${section.cards.length}',
+                  style: const TextStyle(
+                    color: Color(0xFF00D09C),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (section.cards.length > 2)
+                TextButton(
+                  onPressed: () {},
+                  child: const Text(
+                    'view all >',
+                    style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
 
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  height: 40,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Center(
-                    child: Text(
-                      "Pay ${card.body.amount}",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  card.body.footerText ?? '',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-              ],
+          StackedCarousel(
+            children: section.cards
+                .map((card) => BillCardWidget(card: card))
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Color(0xFFFF453A)),
+            const SizedBox(height: 16),
+            const Text(
+              'Failed to load bills',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 12),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00D09C),
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('Retry'),
             ),
           ],
         ),
