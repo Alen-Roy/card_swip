@@ -1,85 +1,129 @@
 import 'package:flutter/material.dart';
+import '../data/api_service.dart';
+import '../data/models.dart';
 
-class BillsScreen extends StatelessWidget {
+class BillsScreen extends StatefulWidget {
   const BillsScreen({super.key});
+
+  @override
+  State<BillsScreen> createState() => _BillsScreenState();
+}
+
+class _BillsScreenState extends State<BillsScreen> {
+  late Future<BillSection> _billsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _billsFuture = ApiService().fetchBills();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              height: 85,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Row(
-                  children: [
-                    CircleAvatar(backgroundColor: Colors.black),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Text(
-                            'HDFC BANK',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'xxxx xxxx xxxx 5676',
-                            style: TextStyle(fontSize: 10),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 80),
-                      child: Column(
-                        children: [
-                          Container(
-                            child: Padding(
-                              padding: const EdgeInsets.only(
-                                top: 10,
-                                bottom: 10,
-                                left: 20,
-                                right: 20,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    "pay \$200",
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            height: 40,
+      body: FutureBuilder<BillSection>(
+        future: _billsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            );
+          }
 
-                            decoration: BoxDecoration(
-                              color: Colors.black,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                          Text('due today'),
-                        ],
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                "Error: ${snapshot.error}",
+                style: const TextStyle(color: Colors.white),
+              ),
+            );
+          }
+
+          final section = snapshot.data!;
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: section.cards.length,
+            itemBuilder: (context, index) {
+              final card = section.cards[index];
+              return buildBillCard(card);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget buildBillCard(BillCard card) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      height: 90,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: Colors.black,
+              backgroundImage: card.body.logo.url.isNotEmpty
+                  ? NetworkImage(card.body.logo.url)
+                  : null,
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    card.body.title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    card.body.subTitle,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Center(
+                    child: Text(
+                      "Pay ${card.body.amount}",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 6),
+                Text(
+                  card.body.footerText ?? '',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
             ),
           ],
         ),
